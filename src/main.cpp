@@ -88,7 +88,7 @@ void opcontrol(){
 
 	while (true){
 		drive -> getModel() -> tank(controller.getAnalog(okapi::ControllerAnalog::leftY), controller.getAnalog(okapi::ControllerAnalog::rightY));
-    pros::delay(10);
+    pros::delay(20);
 
 	}
 	//user_drive();
