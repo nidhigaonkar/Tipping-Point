@@ -11,7 +11,7 @@ void on_center_button() {
 	static bool pressed = false;
 	pressed = !pressed;
 	if (pressed) {
-		pros::lcd::set_text(2, "I was pressed!");
+		// pros::lcd::set_text(2, "I was pressed!");
 	} else {
 		pros::lcd::clear_line(2);
 	}
@@ -30,14 +30,18 @@ Controller controller;
 //Misc Motor Initialization
 Motor four_bar_lift(10, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
 Motor chain_bar(9, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
+IMU inertial_sensor(4, IMUAxes::z);
 
 //Variable Initialization
 int A_buttonPress = 0;
 int lift_macro_level = 0;
+double values = 0;
 double chain_bar_speed = 0;
 double chain_bar_PID_speed = 0;
 double four_bar_speed = 0;
 double four_bar_PID_speed = 0;
+double inerL = 0;
+double inerR = 0;
 
 struct PID
 {
@@ -104,6 +108,7 @@ double four_bar_PID(double four_bar_setpoint) 					//PID for four bar
 
 void movement_PID(double left_distance, double right_distance)
 {
+
 	drive -> getModel() -> setEncoderUnits(AbstractMotor::encoderUnits::degrees);
 
 	double left_target = left_distance * (360 / (2 * 3.1415 * (4 / 2)));				// calculates left side motors target distance in wheel degrees
@@ -131,19 +136,39 @@ void movement_PID(double left_distance, double right_distance)
 
 	while (true)
 	{
-		//pros::lcd::set_text(3, std::to_string(drive -> getModel() -> getSensorVals()[0]));
+		values = inertial_sensor.get();
+		pros::lcd::set_text(1, std::to_string(values));
+		if(values > 0)
+		{
+			inerR = 0.005*values/2;
+			inerL = 0;
+		}
+		else if (values < 0)
+		{
+			inerL = 0.005*values/2;
+			inerR = 0;
+		}
+		else
+		{
+			inerL = 0;
+			inerR = 0;
+		}
 		left_drive_PID.error = left_target - drive -> getModel() -> getSensorVals()[0];
-		left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error); 							//returns speed for left side
-		pros::lcd::set_text(5, std::to_string(left_drive_PID.error));
+		left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error);
+		left_drive_PID.speed += inerL;
+		//pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));	//returns speed for left side
+		//pros::lcd::set_text(1, std::to_string(left_drive_PID.speed));
 
 		right_drive_PID.error = right_target - drive -> getModel() -> getSensorVals()[1];
 		right_drive_PID.speed = right_pid_controller.step(right_drive_PID.error); 					//returns speed for right side
-		pros::lcd::set_text(6, std::to_string(right_drive_PID.error));
+		//pros::lcd::set_text(2, std::to_string(right_drive_PID.speed));
+		right_drive_PID.speed += inerR;
 
-		pros::lcd::set_text(1, std::to_string(leftBack.getPosition()));
-		pros::lcd::set_text(2, std::to_string(leftFront.getPosition()));
-		pros::lcd::set_text(3, std::to_string(rightBack.getPosition()));
-		pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
+		// FOR DRIVE
+		//pros::lcd::set_text(1, "Hello Your MOM!");
+		// pros::lcd::set_text(2, std::to_string(leftFront.getPosition()));
+		// pros::lcd::set_text(3, std::to_string(rightBack.getPosition()));
+		// pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
 
 		drive -> getModel() -> tank(-left_drive_PID.speed, -right_drive_PID.speed);
 
@@ -167,7 +192,7 @@ void movement_PID(double left_distance, double right_distance)
  */
 void initialize() {
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
+	// pros::lcd::set_text(1, "Hello PROS User!");
 
 	pros::lcd::register_btn1_cb(on_center_button);
 }
@@ -203,7 +228,7 @@ void competition_initialize() {}
  */
 void autonomous()
 {
-	//movement_PID(70, 70);
+
 }
 
 /**
@@ -226,7 +251,8 @@ void opcontrol()
 	//movement_PID(40, 40);
 	double chain_bar_setpoint = chain_bar.getPosition();    //Marks position of chain bar
 	double four_bar_setpoint = four_bar_lift.getPosition(); //Marks position of four bar
-
+	movement_PID(90, 90);
+	opcontrol();
 	while (true)
 	{
 		//Main drivetrain code
@@ -245,7 +271,7 @@ void opcontrol()
 			{
 				A_buttonPress = A_buttonPress + 1;
 			}
-			pros::lcd::set_text(2, std::to_string(A_buttonPress));
+			// pros::lcd::set_text(2, std::to_string(A_buttonPress));
 			pros::delay(1000); 																//delay so won't keep adding to count
 		}
 
@@ -368,8 +394,7 @@ void opcontrol()
 			//pros::lcd::set_text(4, std::to_string(chain_bar.getPosition()));
 		}
 
-		pros::delay(20);
+		pros::delay(10);
 
 	}
 }
-//https://github.com/ananthgoyal/TippingPoint/tree/master/src
