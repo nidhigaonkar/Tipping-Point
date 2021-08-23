@@ -17,7 +17,6 @@ void on_center_button() {
 	}
 }
 
-
 //Drivetrain Motor initialization
 Motor rightBack(8, true, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
 Motor rightFront(6, true, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
@@ -30,18 +29,26 @@ Controller controller;
 //Misc Motor Initialization
 Motor four_bar_lift(10, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
 Motor chain_bar(9, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
+Motor mogo_lift(7, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
+Motor mogo_spinner(3, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
+
+//Sensor Initialization
 IMU inertial_sensor(4, IMUAxes::z);
 
 //Variable Initialization
 int A_buttonPress = 0;
 int lift_macro_level = 0;
-double values = 0;
+int mogo_macro_level = 2;
+
+double inertial_values = 0;
+
 double chain_bar_speed = 0;
 double chain_bar_PID_speed = 0;
+
 double four_bar_speed = 0;
 double four_bar_PID_speed = 0;
-double inerL = 0;
-double inerR = 0;
+
+double mogo_lift_speed = 0;
 
 struct PID
 {
@@ -61,6 +68,7 @@ typedef struct PID pid;
 
 pid CB; 								//Chain bar PID
 pid FB; 								//Four bar PID
+pid ML;
 pid left_drive_PID; 		//PID for left side of drivetrain
 pid right_drive_PID;		//PID for right side of drivetrain
 
@@ -76,7 +84,7 @@ std::shared_ptr<ChassisController> drive =
 double chain_bar_PID(double chain_bar_set) 							//PID for chain bar
 {
 	CB.kP = 0.3;
-	CB.kI = 0.0003;
+	CB.kI = 0.0002;
 	CB.kD = 0.01;
 	CB.target = chain_bar_set;
 	//pros::lcd::set_text(4, std::to_string(chain_bar.getPosition()));
@@ -92,9 +100,9 @@ double chain_bar_PID(double chain_bar_set) 							//PID for chain bar
 
 double four_bar_PID(double four_bar_setpoint) 					//PID for four bar
 {
-	FB.kP = 0; //need tuning
-	FB.kI = 0; //need tuning
-	FB.kD = 0; //need tuning
+	FB.kP = 0.2; //need tuning
+	FB.kI = 0.001; //need tuning
+	FB.kD = 0.007; //need tuning
 	FB.target = four_bar_setpoint;
 	FB.error = FB.target - four_bar_lift.getPosition();
 	FB.derivative = FB.error - FB.prev_error;
@@ -106,9 +114,27 @@ double four_bar_PID(double four_bar_setpoint) 					//PID for four bar
 	pros::delay(10);
 }
 
-void movement_PID(double left_distance, double right_distance)
+double mogo_lift_PID(double mogo_lift_setpoint)					//PID for mogo lift
+{
+	ML.kP = 0.2; //need tuning
+	ML.kI = 0.001; //need tuning
+	ML.kD = 0.005; //need tuning
+	ML.target = mogo_lift_setpoint;
+	ML.error = ML.target - mogo_lift.getPosition();
+	ML.derivative = ML.error - ML.prev_error;
+	ML.integral += ML.error;
+	ML.prev_error = ML.error;
+	ML.speed = ML.error * ML.kP + ML.integral * ML.kI + ML.derivative * ML.kD;
+	pros::lcd::set_text(2, std::to_string(ML.speed));
+	pros::lcd::set_text(4, std::to_string(mogo_lift.getPosition()));
+	return ML.speed;
+	pros::delay(10);
+}
+
+void translate_PID(double left_distance, double right_distance)
 {
 
+	inertial_values = 0;
 	drive -> getModel() -> setEncoderUnits(AbstractMotor::encoderUnits::degrees);
 
 	double left_target = left_distance * (360 / (2 * 3.1415 * (4 / 2)));				// calculates left side motors target distance in wheel degrees
@@ -132,51 +158,104 @@ void movement_PID(double left_distance, double right_distance)
 																																 right_drive_PID.kI,
 																																 right_drive_PID.kD);
 
-	drive -> getModel() -> resetSensors(); 																								//reset sensor values before use
+	drive -> getModel() -> resetSensors();						//reset drivetrain motor sensor values before use
+	inertial_sensor.reset();													//reset inertial sensor values before use
 
 	while (true)
 	{
-		values = inertial_sensor.get();
-		pros::lcd::set_text(1, std::to_string(values));
-		if(values > 0)
-		{
-			inerR = 0.005*values/2;
-			inerL = 0;
-		}
-		else if (values < 0)
-		{
-			inerL = 0.005*values/2;
-			inerR = 0;
-		}
-		else
-		{
-			inerL = 0;
-			inerR = 0;
-		}
+
+		//pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));
 		left_drive_PID.error = left_target - drive -> getModel() -> getSensorVals()[0];
-		left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error);
-		left_drive_PID.speed += inerL;
-		//pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));	//returns speed for left side
-		//pros::lcd::set_text(1, std::to_string(left_drive_PID.speed));
+		left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error); 							//returns speed for left side
+		//pros::lcd::set_text(1, std::to_string(left_drive_PID.error));
 
 		right_drive_PID.error = right_target - drive -> getModel() -> getSensorVals()[1];
 		right_drive_PID.speed = right_pid_controller.step(right_drive_PID.error); 					//returns speed for right side
-		//pros::lcd::set_text(2, std::to_string(right_drive_PID.speed));
-		right_drive_PID.speed += inerR;
+		//pros::lcd::set_text(2, std::to_string(right_drive_PID.error));
+		//pros::lcd::set_text(3, std::to_string(leftFront.getPosition()));
+		//pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
 
-		// FOR DRIVE
-		//pros::lcd::set_text(1, "Hello Your MOM!");
-		// pros::lcd::set_text(2, std::to_string(leftFront.getPosition()));
-		// pros::lcd::set_text(3, std::to_string(rightBack.getPosition()));
-		// pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
+		inertial_values = inertial_sensor.get();
+		pros::lcd::set_text(4, std::to_string(inertial_values));
+		if (inertial_values < 0)
+		{
+			right_drive_PID.speed += abs(inertial_values) * 0.01;
+			left_drive_PID.speed -= abs(inertial_values) * 0.01;
+		}
+		else if (inertial_values > 0)
+		{
+			left_drive_PID.speed += abs(inertial_values) * 0.01;
+			right_drive_PID.speed -= abs(inertial_values) * 0.01;
+		}
+		pros::lcd::set_text(2, std::to_string(left_drive_PID.speed));
+		pros::lcd::set_text(3, std::to_string(right_drive_PID.speed));
 
 		drive -> getModel() -> tank(-left_drive_PID.speed, -right_drive_PID.speed);
 
-		pros::delay(20);
-		if (abs(left_drive_PID.error) < 0.1 and abs(right_drive_PID.error) < 0.1)
+		if ((abs(left_drive_PID.error) < 5) && (abs(right_drive_PID.error) < 5))
 		{
 			break;
 		}
+
+		pros::delay(20);
+	}
+
+	drive -> getModel() -> tank(0, 0); 								//brakes drivetrain right after PID movement
+
+}
+
+void rotate_PID(double turn_degrees)
+{
+	drive -> getModel() -> setEncoderUnits(AbstractMotor::encoderUnits::degrees);
+
+	inertial_values = 0;
+
+	//PID constants
+	left_drive_PID.kP = 0.010150;
+	left_drive_PID.kI = 0.0080;
+	left_drive_PID.kD = 0.000005;
+
+	right_drive_PID.kP = 0.010150;
+	right_drive_PID.kI = 0.0080;
+	right_drive_PID.kD = 0.000005;
+
+	//initializes left and right side drivetrain PID controllers
+	auto left_pid_controller = IterativeControllerFactory::posPID(left_drive_PID.kP,
+																																left_drive_PID.kI,
+																																left_drive_PID.kD);
+
+	auto right_pid_controller = IterativeControllerFactory::posPID(right_drive_PID.kP,
+																																 right_drive_PID.kI,
+																																 right_drive_PID.kD);
+
+	drive -> getModel() -> resetSensors();			//reset drivetrain motor sensor values before use
+	inertial_sensor.reset();										//reset inertial sensor values before use
+
+	while (true)
+	{
+
+		inertial_values = inertial_sensor.get();
+		pros::lcd::set_text(1, std::to_string(inertial_values));
+
+		//pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));
+		left_drive_PID.error = turn_degrees - inertial_values;
+		left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error); 							//returns speed for left side
+
+		right_drive_PID.error = turn_degrees - inertial_values;
+		right_drive_PID.speed = right_pid_controller.step(right_drive_PID.error); 					//returns speed for right side
+		//pros::lcd::set_text(3, std::to_string(leftFront.getPosition()));
+		//pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
+		//pros::lcd::set_text(2, std::to_string(left_drive_PID.error));
+		//pros::lcd::set_text(3, std::to_string(right_drive_PID.error));
+
+		drive -> getModel() -> tank(-left_drive_PID.speed, right_drive_PID.speed);
+
+		if ((abs(left_drive_PID.error) < 0.5) && (abs(right_drive_PID.error) < 0.5))
+		{
+			break;
+		}
+
+		pros::delay(20);
 	}
 
 	drive -> getModel() -> tank(0, 0); 								//brakes drivetrain right after PId movement
@@ -228,7 +307,7 @@ void competition_initialize() {}
  */
 void autonomous()
 {
-
+	//movement_PID(70, 70);
 }
 
 /**
@@ -246,13 +325,15 @@ void autonomous()
  */
 void opcontrol()
 {
-	//movement_PID(40, 40);
-	//movement_PID(24.5, -24.5);
-	//movement_PID(40, 40);
+	//translate_PID(80, 80);
+	//rotate_PID(90);
+	//rotate_PID(90);
+	//translate_PID(80, 80);
+
 	double chain_bar_setpoint = chain_bar.getPosition();    //Marks position of chain bar
 	double four_bar_setpoint = four_bar_lift.getPosition(); //Marks position of four bar
-	movement_PID(90, 90);
-	opcontrol();
+	double mogo_lift_setpoint = mogo_lift.getPosition();		//Marks position of mogo lift
+
 	while (true)
 	{
 		//Main drivetrain code
@@ -260,33 +341,37 @@ void opcontrol()
 																controller.getAnalog(ControllerAnalog::rightY));
 
 
+
 		if (controller.getDigital(ControllerDigital::A) == 1)
 		{
-			pros::delay(1000);
 			if (A_buttonPress > 1) 														 //resets count
 			{
+				lift_macro_level = 0;
 				A_buttonPress = 1;
 			}
 			else
 			{
 				A_buttonPress = A_buttonPress + 1;
 			}
-			// pros::lcd::set_text(2, std::to_string(A_buttonPress));
-			pros::delay(1000); 																//delay so won't keep adding to count
+			pros::lcd::set_text(2, std::to_string(A_buttonPress));
+			pros::delay(500); 																//delay so won't keep adding to count
 		}
 
-		if (A_buttonPress == 1) 														//Macros for lift
+
+		//Macros for lift ------------------------------------------------------------------------------
+		if (A_buttonPress == 1)
 		{
+
 			if (controller.getDigital(ControllerDigital::R1) == 1) //sets 4 different macros
 			{
 
-				if (lift_macro_level > 30)
+				if (lift_macro_level > 40) //max 50
 				{
 					lift_macro_level = 10;
 				}
 				else
 				{
-					lift_macro_level += 10;
+					lift_macro_level += 10; //incrememnts by 10, possible values (10, 20, 30, 40, 50)
 				}
 				//pros::lcd::set_text(5, std::to_string(R1_buttonPress));
 				pros::delay(500);
@@ -294,42 +379,64 @@ void opcontrol()
 
 			if (controller.getDigital(ControllerDigital::R2) == 1)
 			{
-				if (lift_macro_level < 20)
+				if (lift_macro_level < 20) //min 10
 				{
-					lift_macro_level = 40;
+					lift_macro_level = 50;
 				}
 				else
 				{
-					lift_macro_level -= 10;
+					lift_macro_level -= 10; //decrements by 10
+				}
+				pros::delay(500);
+			}
+			//pros::lcd::set_text(3, std::to_string(lift_macro_level));
+
+			if (controller.getDigital(ControllerDigital::up) == 1)		//toggle between up and down position
+			{
+				if (mogo_macro_level < 1)
+				{
+					mogo_macro_level  = 1;
+				}
+				else
+				{
+					mogo_macro_level -= 1;
 				}
 				pros::delay(500);
 			}
 
-			if (lift_macro_level == 10) 												// first macro (first height)
+			if (lift_macro_level == 10) 												// first macro (neutral mogo, bottom branch)
 			{
-				chain_bar_PID_speed = chain_bar_PID(-200);
-				chain_bar.moveVelocity(chain_bar_PID_speed);
+				chain_bar_PID_speed = chain_bar_PID(-130);
+				four_bar_PID_speed = four_bar_PID(-500);
 
-				four_bar_PID_speed = four_bar_PID(0);
+				chain_bar.moveVelocity(chain_bar_PID_speed);
 				four_bar_lift.moveVelocity(four_bar_PID_speed);
 			}
-			else if (lift_macro_level == 20)										//second macro (second height)
+			else if (lift_macro_level == 20)										//second macro (neutral mogo, top branch)
 			{
-				chain_bar_PID_speed = chain_bar_PID(-500);
-				chain_bar.moveVelocity(chain_bar_PID_speed);
+				chain_bar_PID_speed = chain_bar_PID(-430);
+				four_bar_PID_speed = four_bar_PID(-500);
 
-				four_bar_PID_speed = four_bar_PID(0);
+				chain_bar.moveVelocity(chain_bar_PID_speed);
 				four_bar_lift.moveVelocity(four_bar_PID_speed);
 			}
-			else if (lift_macro_level == 30)										//thrid macro (third height)
+			else if (lift_macro_level == 30)										//thrid macro (alliance mogo)
 			{
-				chain_bar_PID_speed = chain_bar_PID(-800);
-				chain_bar.moveVelocity(chain_bar_PID_speed);
+				chain_bar_PID_speed = chain_bar_PID(-1300);
+				four_bar_PID_speed = four_bar_PID(-500);
 
-				four_bar_PID_speed = four_bar_PID(0);
+				chain_bar.moveVelocity(chain_bar_PID_speed);
 				four_bar_lift.moveVelocity(four_bar_PID_speed);
 			}
-			else if (lift_macro_level == 40)										//fourth macro (sets lift back at starting position)
+			else if (lift_macro_level == 40)										//fourth macro (ring intake)
+			{
+				chain_bar_PID_speed = chain_bar_PID(-1200);
+				four_bar_PID_speed = four_bar_PID(0);
+
+				chain_bar.moveVelocity(chain_bar_PID_speed);
+				four_bar_lift.moveVelocity(four_bar_PID_speed);
+			}
+			else if (lift_macro_level == 50 || lift_macro_level == 0)										//fifth macro (starting position)
 			{
 				chain_bar_PID_speed = chain_bar_PID(0);
 				chain_bar.moveVelocity(chain_bar_PID_speed);
@@ -337,19 +444,82 @@ void opcontrol()
 				four_bar_PID_speed = four_bar_PID(0);
 				four_bar_lift.moveVelocity(four_bar_PID_speed);
 			}
+
+			//Macros for Mogo Lift ------------------------------------------------------------------------------
+			if (mogo_macro_level == 0)
+			{
+				mogo_lift_speed = mogo_lift_PID(-500);
+				mogo_lift.moveVelocity(mogo_lift_speed);
+			}
+			else if (mogo_macro_level == 1)
+			{
+				mogo_lift_speed = mogo_lift_PID(-420);
+				mogo_lift.moveVelocity(mogo_lift_speed);
+			}
 		}
 
 		else if (A_buttonPress == 2)												//user control lift
 		{
-			if (controller.getDigital(ControllerDigital::L1) == 1)
+
+			//Mogo Lift Buttons ------------------------------------------------------------------------------
+			if (controller.getDigital(ControllerDigital::up) == 1)
 			{
-				four_bar_lift.moveVelocity(100);								//Moves four bar up when L1 is pressed
-				four_bar_setpoint = four_bar_lift.getPosition();
+				if (mogo_lift.getPosition() > -10)
+				{
+					mogo_lift.moveVelocity(0);
+					mogo_lift_setpoint = mogo_lift.getPosition();
+				}
+				else
+				{
+					mogo_lift.moveVelocity(100);
+					mogo_lift_setpoint = mogo_lift.getPosition();
+				}
 			}
-			else if (controller.getDigital(ControllerDigital::L2) == 1)
+			else if (controller.getDigital(ControllerDigital::down) == 1)
 			{
-				four_bar_lift.moveVelocity(-100);								//Moves four bar down when L2 is pressed
-				four_bar_setpoint = four_bar_lift.getPosition();
+				if (mogo_lift.getPosition() < -490)
+				{
+					mogo_lift.moveVelocity(0);
+					mogo_lift_setpoint = mogo_lift.getPosition();
+				}
+				else
+				{
+					mogo_lift.moveVelocity(-100);
+					mogo_lift_setpoint = mogo_lift.getPosition();
+				}
+			}
+			else if ((controller.getDigital(ControllerDigital::Y) == 0) and controller.getDigital(ControllerDigital::X) == 0)
+			{
+				mogo_lift_speed = mogo_lift_PID(mogo_lift_setpoint);
+				mogo_lift.moveVelocity(mogo_lift_speed);
+			}
+
+			//Four Bar Buttons ------------------------------------------------------------------------------
+			if (controller.getDigital(ControllerDigital::L2) == 1)
+			{
+				if (four_bar_lift.getPosition() > -5)
+				{
+					four_bar_lift.moveVelocity(0);
+					four_bar_setpoint = four_bar_lift.getPosition();
+				}
+				else
+				{
+					four_bar_lift.moveVelocity(100);								//Moves four bar up when L1 is pressed
+					four_bar_setpoint = four_bar_lift.getPosition();
+				}
+			}
+			else if (controller.getDigital(ControllerDigital::L1) == 1)
+			{
+				if (four_bar_lift.getPosition() < -500)
+				{
+					four_bar_lift.moveVelocity(0);
+					four_bar_setpoint = four_bar_lift.getPosition();
+				}
+				else
+				{
+					four_bar_lift.moveVelocity(-100);								//Moves four bar down when L2 is pressed
+					four_bar_setpoint = four_bar_lift.getPosition();
+				}
 			}
 			else if((controller.getDigital(ControllerDigital::L1) == 0) and controller.getDigital(ControllerDigital::L2) == 0)
 			{
@@ -358,10 +528,10 @@ void opcontrol()
 			}
 
 
-			//Chain Bar Buttons
+			//Chain Bar Buttons ------------------------------------------------------------------------------
 			if (controller.getDigital(ControllerDigital::R2) == 1)
 			{
-				if (chain_bar.getPosition() > 0)								//Stops chain bar from going under starting position
+				if (chain_bar.getPosition() > -10)								//Stops chain bar from going under starting position
 				{
 					chain_bar.moveVelocity(0);
 					chain_bar_setpoint = chain_bar.getPosition();
@@ -375,7 +545,7 @@ void opcontrol()
 
 			else if (controller.getDigital(ControllerDigital::R1) == 1)
 			{
-				if (chain_bar.getPosition() < -1360)						//Stops chain bar from going over maximum position
+				if (chain_bar.getPosition() < -1175)						//Stops chain bar from going over maximum position
 				{
 					chain_bar.moveVelocity(0);
 					chain_bar_setpoint = chain_bar.getPosition();
@@ -394,7 +564,19 @@ void opcontrol()
 			//pros::lcd::set_text(4, std::to_string(chain_bar.getPosition()));
 		}
 
-		pros::delay(10);
+		if (controller.getDigital(ControllerDigital::B) == 1)				//automated platform balancing
+		{
+			inertial_sensor.reset();
+			drive -> getModel() -> resetSensors();
+
+			while (true)
+			{
+				inertial_values = inertial_sensor.get();
+			}
+		}
+
+		pros::delay(20);
 
 	}
 }
+//https://github.com/ananthgoyal/TippingPoint/tree/master/src
