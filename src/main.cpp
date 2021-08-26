@@ -311,70 +311,18 @@ void competition_initialize() {}
 void autonomous()
 {
 
-	//double mogo_lift_setpoint = mogo_lift.getPosition() //right front motor  is on passive side
-	translate_PID(54, 54); //drive forward 54 inches
-	//pros::delay(500);
-
-	//passive mogo code (pick up first neutral mogo) by raising lift
-	four_bar_lift.moveVelocity(-500); //negative is up for the four bar
-
-
-	rotate_PID(90); //turn 90 degrees so motorized side faces middle neutral goal
-
-	translate_PID(9,9);
-
-	//code to pick up first netural mogo
-	mogo_lift_speed = mogo_lift_PID(-500);
-	mogo_lift.moveVelocity(mogo_lift_speed); //moves mogo lift down
-
-	translate_PID(-5,-5); //pick up mogo by moving forward
-
-	mogo_lift_speed = mogo_lift_PID(-420); //moves mogo lift slightly back up
-	mogo_lift.moveVelocity(mogo_lift_speed);
-
-	translate_PID(13,13);
-
-	//edit code after this
-	rotate_PID(45);
-	translate_PID(40,40); //move backwards back towards our alliance side
-
-	mogo_lift_speed = mogo_lift_PID(-500);  //move mogo lift down
-	mogo_lift.moveVelocity(mogo_lift_speed);
-
-	translate_PID(-5,-5); //drive backward to drop mogo
-
-
-		translate_PID(8,8);
-		rotate_PID(-90);
-
-		//grab alliance mogo out of autonomous win zone
-
-		mogo_lift_speed = mogo_lift_PID(-500);
-		mogo_lift.moveVelocity(mogo_lift_speed); //moves mogo lift down
-
-		translate_PID(-5,-5); //pick up mogo by moving forward
-
-		mogo_lift_speed = mogo_lift_PID(-420); //moves mogo lift slightly back up
-		mogo_lift.moveVelocity(mogo_lift_speed);
-
-
-		//turn so motorized side faces our platform
-
-		rotate_PID(75);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	mogo_lift.moveVelocity(mogo_lift_PID(-500));//lower mogo lift
+	translate_PID(46.5, 46.5);//67.5 inches from barrier
+	pros::delay(100);//wait
+	mogo_lift.moveVelocity(mogo_lift_PID(-400));//pick up mogo
+	rotate_PID(-37);//turn towards alliance mogo :)
+	pros::delay(50);//pause
+	translate_PID(40, 40);//move forward to alliance mogo
+	four_bar_lift.moveVelocity(foud_bar_lift_PID(-500));//activates passivve intake
+	translate_PID(-10, -10);//move mogo from the line
+	chain_bar_lift.moveVelocity(chain_bar_PID(-1300));//setup for pneumatic release
+	four_bar_lift.mvoveVelocity(four_bar_PID(-500));//setup for pneumatic release
+	//pneumatic release
 
 
 
