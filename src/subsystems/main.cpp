@@ -80,6 +80,7 @@ void opcontrol()
 	while(true)
 	{
 		joystickDrive();
+		itz_lift_control();
 
 		pros::delay(10);
 	}
