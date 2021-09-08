@@ -1,20 +1,13 @@
-#include "main.h"
-using namespace okapi;
+#include "main.h";
 
-/*std::shared_ptr<ChassisController> drive =
+std::shared_pts<ChassisController> drive =
   ChassisControllerBuilder()
-    .withMotors(leftMotorGroup, rightMotorGroup)
-    .withDimensions(AbstractMotor::gearset::green, {{4.125, 10}, imev5GreenTPR})
-    .build();*/
+  .withMotors({leftBackDrive, leftFrontDrive}, {rightFrontDrive, rightBackDrive}) 												//MotorGroups for left and right side
+  .withDimensions(AbstractMotor::gearset::green, {{4_in, 10_in}, imev5BlueTPR})		  //Gearset(rpm) and wheel dimensions
+  .build();
 
-
-void user_drive(){
-  while (true)
-  {
-    /*int rightJoystickValue = controller.getAnalog(okapi::ControllerAnalog::rightY);
-    int leftJoystickValue = controller.getAnalog(okapi::ControllerAnalog::leftY);
-    drive -> getModel() -> tank(leftJoystickValue, rightJoystickValue);
-    pros::delay(10);*/
-
-  }
+void joystickDrive()
+{
+  drive -> getModel() -> arcade(controller.getAnalog(ControllerAnalog::leftY),
+                                controller.getAnalog(ControllerAnalog::rightX));
 }
