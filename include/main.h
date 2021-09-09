@@ -75,8 +75,8 @@ void opcontrol(void);
 /**
  * You can add C++-only headers here
  */
-#include "subsystems/drivetrain.hpp"
 #include "subsystems/itz_mogo.hpp"
+#include "subsystems/drivetrain.hpp"
 //#include <iostream>
 #endif
 
