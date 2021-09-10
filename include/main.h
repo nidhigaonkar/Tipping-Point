@@ -77,6 +77,7 @@ void opcontrol(void);
  */
 #include "subsystems/itz_mogo.hpp"
 #include "subsystems/drivetrain.hpp"
+#include "subsystems/globals.hpp"
 //#include <iostream>
 #endif
 
