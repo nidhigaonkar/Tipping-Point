@@ -2,6 +2,12 @@
 
 using namespace okapi;
 
+std::shared_ptr<ChassisController> drive =
+  ChassisControllerBuilder()
+  .withMotors({-6, -17}, {10, 7})   //MotorGroups for left and right side
+  .withDimensions(AbstractMotor::gearset::blue, {{4_in, 10_in}, imev5BlueTPR})		  //Blue gearset(100 rpm) and wheel dimensions
+  .build();
+
 /**
  * A callback function for LLEMU's center button.
  *
@@ -79,7 +85,7 @@ void opcontrol()
 {
 	while(true)
 	{
-		joystickDrive();
+		drive -> getModel() -> arcade(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightX));
 		itz_lift_control();
 
 		pros::delay(10);
