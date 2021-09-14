@@ -2,17 +2,18 @@
 
 using namespace okapi;
 
-/*
+Motor rightFront(rightFrontPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
+Motor rightBack(rightBackPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
+Motor leftFront(leftFrontPort, false, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
+Motor leftBack(leftBackPort, false, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
+
 std::shared_ptr<ChassisController> drive =
   ChassisControllerBuilder()
-  .withMotors({leftBackDrive, leftFrontDrive}, {rightFrontDrive, rightBackDrive})   //MotorGroups for left and right side
+  .withMotors({leftFront, leftBack}, {rightFront, rightBack})   //MotorGroups for left and right side
   .withDimensions(AbstractMotor::gearset::blue, {{4_in, 10_in}, imev5BlueTPR})		  //Blue gearset(100 rpm) and wheel dimensions
   .build();
 
-void joystickDrive()
+void updateDrive()
 {
-  drive -> getModel() -> tank(controller.getAnalog(ControllerAnalog::leftY),
-                              controller.getAnalog(ControllerAnalog::rightY));
-  pros::lcd::set_text(3, "hello");
+  drive -> getModel() -> arcade(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightX));
 }
-**/
