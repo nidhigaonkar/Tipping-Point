@@ -2,7 +2,9 @@
 
 using namespace okapi;
 
-void itz_lift_control()
+Motor itz_lift(itzLiftPort, false, AbstractMotor::gearset::red, AbstractMotor::encoderUnits::degrees);
+
+void updateItzLift()
 {
   itz_lift.moveVelocity(100*(controller.getDigital(ControllerDigital::R2) - controller.getDigital(ControllerDigital::R1)));
 }
