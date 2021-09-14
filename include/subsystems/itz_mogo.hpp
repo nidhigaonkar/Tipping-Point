@@ -1,3 +1,7 @@
 #include "main.h"
 
-void itz_lift_control();
+using namespace okapi;
+
+extern Motor itz_lift;
+
+void updateItzLift();
