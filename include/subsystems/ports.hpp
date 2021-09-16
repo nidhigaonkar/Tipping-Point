@@ -8,7 +8,7 @@ const int leftBackPort = 7;
 
 //Lift Ports
 const int itzLiftPort = 5;
-const int fourBarLiftPort = 0;
+const int fourBarLiftPort = 11;
 
 //Roller intake Port
 const int rollerPort = 0;
