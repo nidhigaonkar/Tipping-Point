@@ -78,6 +78,8 @@ void opcontrol(void);
 #include "subsystems/itz_mogo.hpp"
 #include "subsystems/drivetrain.hpp"
 #include "subsystems/fourBarLift.hpp"
+#include "subsystems/rollers.hpp"
+#include "subsystems/pneumatics.hpp"
 #include "subsystems/globals.hpp"
 #include "subsystems/ports.hpp"
 //#include <iostream>
