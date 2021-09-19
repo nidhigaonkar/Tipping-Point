@@ -12,3 +12,8 @@ const int fourBarLiftPort = 11;
 
 //Roller intake Port
 const int rollerPort = 0;
+
+//Pneumatic Ports
+
+const char pneumaticLeftPort = 'C';
+const char pneumaticRightPort = 'D';
