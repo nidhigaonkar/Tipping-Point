@@ -82,9 +82,9 @@ void opcontrol()
 {
 	while(true)
 	{
-    updateDrive();
+		updateDrive();
 		updateItzLift();
-    updateFourBarLift();
+		updateFourBarLift();
 		updateRollers();
 
 		pros::delay(10);
