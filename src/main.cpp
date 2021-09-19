@@ -28,6 +28,9 @@ void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
 
+	pros::c::adi_pin_mode(pneumaticLeftPort, OUTPUT);
+	pros::c::adi_pin_mode(pneumaticRightPort, OUTPUT);
+
 	pros::lcd::register_btn1_cb(on_center_button);
 }
 
@@ -79,9 +82,10 @@ void opcontrol()
 {
 	while(true)
 	{
-    		updateDrive();
+    updateDrive();
 		updateItzLift();
-    		updateFourBarLift();
+    updateFourBarLift();
+		updateRollers();
 
 		pros::delay(10);
 	}
