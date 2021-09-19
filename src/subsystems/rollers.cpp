@@ -1,0 +1,11 @@
+#include "main.h"
+
+using namespace okapi;
+
+Motor rollers(rollerPort, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::degrees);
+
+void updateRollers()
+{
+  rollers.moveVelocity(100 * (controller.getDigital(ControllerDigital::L1) - controller.getDigital(ControllerDigital::L2)));
+  rollers.setBrakeMode(AbstractMotor::brakeMode::coast);
+}
