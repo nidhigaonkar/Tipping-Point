@@ -8,3 +8,5 @@ extern Motor rightBack;
 extern Motor rightFront;
 
 void updateDrive();
+
+void translatePID();
