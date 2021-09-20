@@ -86,6 +86,7 @@ void opcontrol()
 		updateItzLift();
 		updateFourBarLift();
 		updateRollers();
+		updatePneumatics();
 
 		pros::delay(10);
 	}
