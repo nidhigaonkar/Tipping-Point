@@ -29,13 +29,13 @@ double PIDFourBar(double setpoint)
 
 void updateFourBarLift()
 {
-  if (controller.getDigital(ControllerDigital::R1) == 0 && controller.getDigital(ControllerDigital::R2) == 0)
+  if (controller.getDigital(ControllerDigital::L1) == 0 && controller.getDigital(ControllerDigital::L2) == 0)
   {
     setpoint = fourBarLift.getPosition();
     fourBarLift.moveVelocity(PIDFourBar(setpoint));
   }
   else
   {
-    fourBarLift.moveVelocity(100 * (controller.getDigital(ControllerDigital::R1) - controller.getDigital(ControllerDigital::R2)));
+    fourBarLift.moveVelocity(100 * (controller.getDigital(ControllerDigital::L1) - controller.getDigital(ControllerDigital::L2)));
   }
 }
