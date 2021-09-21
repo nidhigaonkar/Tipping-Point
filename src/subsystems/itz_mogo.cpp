@@ -6,5 +6,5 @@ Motor itz_lift(itzLiftPort, false, AbstractMotor::gearset::red, AbstractMotor::e
 
 void updateItzLift()
 {
-  itz_lift.moveVelocity(100*(controller.getDigital(ControllerDigital::R2) - controller.getDigital(ControllerDigital::R1)));
+  itz_lift.moveVelocity(100*(controller.getDigital(ControllerDigital::down) - controller.getDigital(ControllerDigital::up)));
 }
