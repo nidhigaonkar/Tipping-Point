@@ -9,4 +9,4 @@ extern Motor rightFront;
 
 void updateDrive();
 
-void translatePID();
+void translatePID(double leftDistance, double rightDistance);
