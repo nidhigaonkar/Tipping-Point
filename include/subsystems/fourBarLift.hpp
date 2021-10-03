@@ -6,4 +6,6 @@ extern Motor fourBarLift;
 
 void updateFourBarLift();
 
+void updateFourMacro();
+
 double PIDFourBar(double setpoint);
