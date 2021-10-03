@@ -82,6 +82,7 @@ void opcontrol(void);
 #include "subsystems/pneumatics.hpp"
 #include "subsystems/globals.hpp"
 #include "subsystems/ports.hpp"
+#include "subsystems/autonomous.hpp"
 //#include <iostream>
 #endif
 
