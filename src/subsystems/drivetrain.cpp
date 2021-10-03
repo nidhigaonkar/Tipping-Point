@@ -18,12 +18,16 @@ typedef struct PID pid;
 pid left;
 pid right;
 
+pid left_drive_PID;
+pid right_drive_PID;
+
+IMU inertial_sensor(imuPort, IMUAxes::z);
+double inertial_values = inertial_sensor.get();
 
 void updateDrive()
 {
   drive -> getModel() -> tank(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightY));
 }
-
 
 void translatePID(double leftDistance, double rightDistance)
 {
@@ -61,26 +65,13 @@ void translatePID(double leftDistance, double rightDistance)
 		right.error = right.target - drive -> getModel() -> getSensorVals()[1];
 		right.power = rightController.step(right.error); 					//returns speed for right side
 		//pros::lcd::set_text(2, std::to_string(right_drive_PID.error));
-		//pros::lcd::set_text(3, std::to_string(leftFront.getPosition()));
-		//pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
-/*
-		inertial_values = inertial_sensor.get();
-		pros::lcd::set_text(4, std::to_string(inertial_values));
-		if (inertial_values < 0)
-		{
-			right_drive_PID.speed += abs(inertial_values) * 0.01;
-			left_drive_PID.speed -= abs(inertial_values) * 0.01;
-		}
-		else if (inertial_values > 0)
-		{
-			left_drive_PID.speed += abs(inertial_values) * 0.01;
-			right_drive_PID.speed -= abs(inertial_values) * 0.01;
-		}
-    **/
+
 		pros::lcd::set_text(2, std::to_string(left.power));
 		pros::lcd::set_text(3, std::to_string(right.power));
 
 		drive -> getModel() -> tank(-left.power, -right.power);
+    pros::lcd::set_text(2, std::to_string(left.error));
+    pros::lcd::set_text(2, std::to_string(right.error));
 
 		if ((abs(left.error) < 5) && (abs(right.error) < 5))
 		{
@@ -92,4 +83,62 @@ void translatePID(double leftDistance, double rightDistance)
 
 	drive -> getModel() -> tank(0, 0); 								//brakes drivetrain right after PID movement
 
+}
+
+
+void rotate_PID(double turn_degrees)
+{
+    drive -> getModel() -> setEncoderUnits(AbstractMotor::encoderUnits::degrees);
+
+    inertial_values = 0;
+
+    //PID constants
+    left_drive_PID.kP = 0.010150;
+    left_drive_PID.kI = 0.0080;
+    left_drive_PID.kD = 0.000005;
+
+    right_drive_PID.kP = 0.010150;
+    right_drive_PID.kI = 0.0080;
+    right_drive_PID.kD = 0.000005;
+
+    //initializes left and right side drivetrain PID controllers
+    auto left_pid_controller = IterativeControllerFactory::posPID(left_drive_PID.kP,
+                                                                                                                                left_drive_PID.kI,
+                                                                                                                                left_drive_PID.kD);
+
+    auto right_pid_controller = IterativeControllerFactory::posPID(right_drive_PID.kP,
+                                                                                                                                 right_drive_PID.kI,
+                                                                                                                                 right_drive_PID.kD);
+
+    drive -> getModel() -> resetSensors();            //reset drivetrain motor sensor values before use
+    inertial_sensor.reset();                                        //reset inertial sensor values before use
+
+    while (true)
+    {
+
+        inertial_values = inertial_sensor.get();
+        pros::lcd::set_text(1, std::to_string(inertial_values));
+
+        //pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));
+        left_drive_PID.error = turn_degrees - inertial_values;
+        left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error);                             //returns speed for left side
+
+        right_drive_PID.error = turn_degrees - inertial_values;
+        right_drive_PID.speed = right_pid_controller.step(right_drive_PID.error);                     //returns speed for right side
+        //pros::lcd::set_text(3, std::to_string(leftFront.getPosition()));
+        //pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
+        //pros::lcd::set_text(2, std::to_string(left_drive_PID.error));
+        //pros::lcd::set_text(3, std::to_string(right_drive_PID.error));
+
+        drive -> getModel() -> arcade(-left_drive_PID.speed, right_drive_PID.speed);
+
+        if ((abs(left_drive_PID.error) < 0.5) && (abs(right_drive_PID.error) < 0.5))
+        {
+            break;
+        }
+
+        pros::delay(20);
+    }
+
+    drive -> getModel() -> tank(0, 0);                                 //brakes drivetrain right after PId movement
 }
