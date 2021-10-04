@@ -248,9 +248,9 @@ void odom_move(double x_pos, double y_pos)
     turnAngle.power = turnController.step(turnAngle.error);
 
     translate.error = sqrt(distanceX * distanceX + distanceY * distanceY);
-		translate.power = moveController.step(translate.error);
+    translate.power = moveController.step(translate.error);
 
-		drive -> getModel() -> tank(translate.power - turnAngle.power, translate.power + turnAngle.power);
+    drive -> getModel() -> tank(translate.power - turnAngle.power, translate.power + turnAngle.power);
 
     if (abs(translate.error) < 5 && abs(turnAngle.error) < 1)
     {
