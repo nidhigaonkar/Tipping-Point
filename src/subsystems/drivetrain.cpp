@@ -6,17 +6,12 @@ Motor rightFront(rightFrontPort, false, AbstractMotor::gearset::blue, AbstractMo
 Motor rightBack(rightBackPort, false, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftFront(leftFrontPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftBack(leftBackPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
-IMU inertial_sensor(imuPort, IMUAxes::z);
 
 typedef struct PID pid;
 
 pid translate;
 pid turnAngle;
-
-pid left_drive_PID;
-pid right_drive_PID;
-
-double inertial_values = inertial_sensor.get();
+pid rotate;
 
 double Sl = 5.125;    //distance from tracking center to middle of left wheel
 double Sr = 5.125;    //distance from tracking center to middle of right wheel
@@ -36,10 +31,9 @@ double changeTheta;
 double newTheta;
 double thetaM;
 
-
 double leftEncoderVals = 0;
 double rightEncoderVals = 0;
-double currentSide = 0;   ///encoder
+double currentSide = 0;
 
 double leftAtReset = 0;
 double rightAtReset = 0;
@@ -72,63 +66,6 @@ std::shared_ptr<ChassisController> drive =
 void updateDrive()
 {
   drive -> getModel() -> tank(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightY));
-}
-
-void rotate_PID(double turn_degrees)
-{
-    drive -> getModel() -> setEncoderUnits(AbstractMotor::encoderUnits::degrees);
-
-    inertial_values = 0;
-
-    //PID constants
-    left_drive_PID.kP = 0.010150;
-    left_drive_PID.kI = 0.0080;
-    left_drive_PID.kD = 0.000005;
-
-    right_drive_PID.kP = 0.010150;
-    right_drive_PID.kI = 0.0080;
-    right_drive_PID.kD = 0.000005;
-
-    //initializes left and right side drivetrain PID controllers
-    auto left_pid_controller = IterativeControllerFactory::posPID(left_drive_PID.kP,
-                                                                                                                                left_drive_PID.kI,
-                                                                                                                                left_drive_PID.kD);
-
-    auto right_pid_controller = IterativeControllerFactory::posPID(right_drive_PID.kP,
-                                                                                                                                 right_drive_PID.kI,
-                                                                                                                                 right_drive_PID.kD);
-
-    drive -> getModel() -> resetSensors();            //reset drivetrain motor sensor values before use
-    inertial_sensor.reset();                                        //reset inertial sensor values before use
-
-    while (true)
-    {
-
-        inertial_values = inertial_sensor.get();
-        pros::lcd::set_text(1, std::to_string(inertial_values));
-
-        //pros::lcd::set_text(2, std::to_string(drive -> getModel() -> getSensorVals()[0]));
-        left_drive_PID.error = turn_degrees - inertial_values;
-        left_drive_PID.speed = left_pid_controller.step(left_drive_PID.error);                             //returns speed for left side
-
-        right_drive_PID.error = turn_degrees - inertial_values;
-        right_drive_PID.speed = right_pid_controller.step(right_drive_PID.error);                     //returns speed for right side
-        //pros::lcd::set_text(3, std::to_string(leftFront.getPosition()));
-        //pros::lcd::set_text(4, std::to_string(rightFront.getPosition()));
-        //pros::lcd::set_text(2, std::to_string(left_drive_PID.error));
-        //pros::lcd::set_text(3, std::to_string(right_drive_PID.error));
-
-        drive -> getModel() -> arcade(-left_drive_PID.speed, right_drive_PID.speed);
-
-        if ((abs(left_drive_PID.error) < 0.5) && (abs(right_drive_PID.error) < 0.5))
-        {
-            break;
-        }
-
-        pros::delay(20);
-    }
-
-    drive -> getModel() -> tank(0, 0);                                 //brakes drivetrain right after PId movement
 }
 
 float modulo(float a, float b)
@@ -261,4 +198,43 @@ void odom_move(double x_pos, double y_pos)
   }
 
   drive -> getModel() -> tank(0, 0);
+}
+
+void odom_rotate(double x_pos, double y_pos)
+{
+  rotate.kP = 0.001575;
+	rotate.kI = 0.0005;
+	rotate.kD = 0.00015;
+
+	auto angleController = IterativeControllerFactory::posPID(rotate.kP, rotate.kI, rotate.kD);
+
+  while (true)
+  {
+    distanceX = x_pos - odometry(x);
+    distanceY = y_pos - odometry(y);
+
+    if (distanceX < 0)
+    {
+      distanceAngle = 3 * (M_PI/2) - atan2f(distanceY, distanceX) - odometry(angle);
+    }
+    else if (distanceX > 0)
+    {
+      distanceAngle = M_PI/2 - atan2f(distanceY, distanceX) - odometry(angle);
+    }
+
+    rotate.error = distanceAngle;
+    rotate.power = angleController.step(rotate.error);
+
+    drive -> getModel() -> tank(rotate.power, -rotate.power);
+
+    if (abs(rotate.error) < 1)
+    {
+      break;
+    }
+
+    pros::delay(10);
+  }
+
+  drive -> getModel() -> tank(0, 0);
+
 }
