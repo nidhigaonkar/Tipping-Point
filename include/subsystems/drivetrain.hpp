@@ -6,6 +6,7 @@ extern Motor leftBack;
 extern Motor leftFront;
 extern Motor rightBack;
 extern Motor rightFront;
+extern ADIEncoder encoder;
 
 void updateDrive();
 
