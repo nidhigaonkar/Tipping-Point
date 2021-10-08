@@ -16,8 +16,8 @@ pid rotate;
 double Sl = 6.25;    //distance from tracking center to middle of left wheel
 double Sr = 6.25;    //distance from tracking center to middle of right wheel
 double Ss = 7.75;     //distance from tracking center to middle of the tracking wheel
-double wheelDiameter = 4.125;   //get correct value
-double trackingDiameter = 3;
+double wheelDiameter = 4;   //get correct value
+double trackingDiameter = 3.25;
 
 double x; //x coordinate returned
 double y; //y coordinate  returned
