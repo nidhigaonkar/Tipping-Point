@@ -13,8 +13,8 @@ pid translate;
 pid turnAngle;
 pid rotate;
 
-double Sl = 5.125;    //distance from tracking center to middle of left wheel
-double Sr = 5.125;    //distance from tracking center to middle of right wheel
+double Sl = 6.25;    //distance from tracking center to middle of left wheel
+double Sr = 6.25;    //distance from tracking center to middle of right wheel
 double Ss = 7.75;     //distance from tracking center to middle of the tracking wheel
 double wheelDiameter = 4.125;   //get correct value
 double trackingDiameter = 3;
