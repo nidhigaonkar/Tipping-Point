@@ -6,6 +6,7 @@ Motor rightFront(rightFrontPort, false, AbstractMotor::gearset::blue, AbstractMo
 Motor rightBack(rightBackPort, false, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftFront(leftFrontPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftBack(leftBackPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
+ADIEncoder encoder(encoderTop, encoderBottom, false);
 
 typedef struct PID pid;
 
