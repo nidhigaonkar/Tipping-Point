@@ -17,5 +17,5 @@ const int rollerPort = 16;
 const char pneumaticLeftPort = 'G';
 
 const int imuPort = 13;
-const char encoderTop = 'A';
-const char encoderBottom = 'B';
+const char encoderTop = 'E';
+const char encoderBottom = 'F';
