@@ -10,4 +10,4 @@ extern ADIEncoder encoder;
 
 void updateDrive();
 
-void translatePID(double leftDistance, double rightDistance);
+void odometry(double x_pos, double y_pos);
