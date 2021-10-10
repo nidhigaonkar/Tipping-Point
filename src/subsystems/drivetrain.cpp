@@ -6,19 +6,19 @@ Motor rightFront(rightFrontPort, false, AbstractMotor::gearset::blue, AbstractMo
 Motor rightBack(rightBackPort, false, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftFront(leftFrontPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
 Motor leftBack(leftBackPort, true, AbstractMotor::gearset::blue, AbstractMotor::encoderUnits::degrees);
-ADIEncoder encoder(encoderTop, encoderBottom, false);
+ADIEncoder encoder(encoderTop, encoderBottom, true);
 
 typedef struct PID pid;
 
 pid translate;
-pid turnAngle;
+pid drift;
 pid rotate;
 
-double Sl = 6.25;    //distance from tracking center to middle of left wheel
-double Sr = 6.25;    //distance from tracking center to middle of right wheel
-double Ss = 7.75;     //distance from tracking center to middle of the tracking wheel
-double wheelDiameter = 4;   //get correct value
-double trackingDiameter = 3.25;
+double Sl = 6;      //distance from tracking center to middle of left wheel
+double Sr = 6;      //distance from tracking center to middle of right wheel
+double Ss = 0.5;    //distance from tracking center to middle of the tracking wheel
+double wheelDiameter = 4;
+double trackingDiameter = 2.75;
 
 double x; //x coordinate returned
 double y; //y coordinate  returned
@@ -55,7 +55,8 @@ double radius;
 
 double distanceX;
 double distanceY;
-double distanceAngle;
+double targetDistance;
+double targetAngle;
 
 std::shared_ptr<ChassisController> drive =
   ChassisControllerBuilder()
@@ -69,173 +70,117 @@ void updateDrive()
   drive -> getModel() -> tank(controller.getAnalog(ControllerAnalog::leftY), controller.getAnalog(ControllerAnalog::rightY));
 }
 
-float modulo(float a, float b)
+
+void odometry(double x_pos, double y_pos)
 {
-  while (a > b)
-  {
-    a -= - b;
-  }
-  return a;
-}
-
-double odometry(char choice)
-{
-
-  //store current encoder values in local variables:
-  leftEncoderVals = (leftBack.getPosition() + leftFront.getPosition())/2;     //average left encoder values
-  rightEncoderVals = (rightBack.getPosition() + rightFront.getPosition())/2;  //average right encoder values
-
-  //currentSide = sideEnc.get_value; //need to get value from side encoder
-
-  deltaLeft = (leftEncoderVals - prevLeftEncoderVals) * 2 * (M_PI / 360) * (wheelDiameter / 2);     //distance travelled since last loop
-  deltaRight = (rightEncoderVals - prevRightEncoderVals) * 2 * (M_PI / 360) * (wheelDiameter / 2);  //distance travelled since last loop
-  deltaSide = (currentSide - prevSidePos) * 2 * (M_PI / 360) * (trackingDiameter / 2); //in inches
-
-  prevLeftEncoderVals = leftEncoderVals;
-  prevRightEncoderVals = rightEncoderVals;
-  prevSidePos = currentSide;
-
-  //Calculate the total change in the left and right encoder values since the last reset, and convert to distance of wheel travel;
-
-  deltaLr = (leftEncoderVals - leftAtReset) * 2 * (M_PI / 360) * (wheelDiameter / 2);
-  deltaRr = (rightEncoderVals - rightAtReset) * 2 * (M_PI / 360) * (wheelDiameter / 2); //in inches
-
-  newTheta = (thetaReset + (deltaLr - deltaRr) / (Sl + Sr));  //step 5
-
-
-  changeTheta = newTheta - angle;
-
-  deltaSide = deltaSide - Ss * changeTheta;
-
-  if(changeTheta == 0)
-  {
-    deltaX = deltaSide; //step 7
-    deltaY = deltaRight;
-  }
-  else
-  {
-    deltaX = (2 * sin(changeTheta / 2)) * (deltaSide / changeTheta + Ss); //step 8
-    deltaY = (2 * sin(changeTheta / 2)) * (deltaRight / changeTheta + Sr);
-  }
-
-
-  thetaM = angle + changeTheta / 2;
-
-
-  theta = atan2f(deltaY, deltaX);
-  radius = sqrt(deltaX * deltaX + deltaY * deltaY);
-  theta = theta - thetaM;         //step 10
-  deltaX = radius * cos(theta);
-  deltaY = radius * sin(theta);
-
-
-  newTheta += M_PI;
-   while (newTheta <= 0)
-   {
-     newTheta += 2 * M_PI;
-   }
-   newTheta = modulo(newTheta, 2 * M_PI);
-   newTheta -= M_PI;
-
-   angle = newTheta;
-   x += deltaX; //step 11
-   y += deltaY;
-
-   switch (choice)
-   {
-    case 'x':
-      return x;
-      break;
-    case 'y':
-      return y;
-      break;
-    case 'a':
-      return angle;
-      break;
-   }
-
-   return 0;
-
-}
-
-void odom_move(double x_pos, double y_pos)
-{
-  //PID constants
-	translate.kP = 0.001575;
-	translate.kI = 0.0005;
-	translate.kD = 0.00015;
+  translate.kP = 0.000001;
+  translate.kI = 0;
+  translate.kD = 0.0000001;
 
 	auto moveController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
-  auto turnController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
+  auto driftController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
+  auto rotateController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
 
-  while (true)
+  bool turnComplete = false;
+  bool routeComplete = false;
+
+  targetAngle = -1 * (atan2f(distanceY, distanceX - M_PI/2));
+
+  while (routeComplete == false)
   {
-    distanceX = x_pos - odometry(x);
-    distanceY = y_pos - odometry(y);
+    leftEncoderVals = ((leftBack.getPosition() * 6 / 5) / 7) * 3;
+    rightEncoderVals = ((rightBack.getPosition() * 6 / 5) / 7) * 3;
+    currentSide = encoder.get();
 
-    if (distanceX < 0)
+    deltaLeft = (leftEncoderVals - prevLeftEncoderVals) * 2 * (M_PI / 360) * (wheelDiameter / 2);
+    deltaRight = (rightEncoderVals - prevRightEncoderVals) * 2 * (M_PI / 360) * (wheelDiameter / 2);
+    deltaSide = (currentSide - prevSidePos) * 2 * (M_PI / 360) * (trackingDiameter / 2);
+
+    prevLeftEncoderVals = leftEncoderVals;
+    prevRightEncoderVals = rightEncoderVals;
+    prevSidePos = currentSide;
+
+     //Calculate the total change in the left and right encoder values since the last reset, and convert to distance of wheel travel;
+
+    deltaLr = ((leftEncoderVals - leftAtReset) * M_PI * wheelDiameter) / 360;
+    deltaRr = ((rightEncoderVals - rightAtReset) * M_PI * wheelDiameter) / 360;
+
+    newTheta = (thetaReset + (deltaLr - deltaRr) / (Sl + Sr));
+
+    changeTheta = newTheta - angle;
+
+    deltaSide = deltaSide - Ss * changeTheta;
+
+    if(changeTheta == 0)
     {
-      distanceAngle = 3 * (M_PI/2) - atan2f(distanceY, distanceX) - odometry(angle);
+      deltaX = deltaSide;
+      deltaY = deltaRight;
     }
-    else if (distanceX > 0)
+    else
     {
-      distanceAngle = M_PI/2 - atan2f(distanceY, distanceX) - odometry(angle);
+      deltaX = (2 * sin(changeTheta / 2)) * (deltaSide / changeTheta + Ss);
+      deltaY = (2 * sin(changeTheta / 2)) * (deltaRight / changeTheta + Sr);
     }
 
-    turnAngle.error = distanceAngle;
-    turnAngle.power = turnController.step(turnAngle.error);
+    thetaM = angle + changeTheta / 2;
 
-    translate.error = sqrt(distanceX * distanceX + distanceY * distanceY);
-    translate.power = moveController.step(translate.error);
+    theta = atan2f(deltaY, deltaX);
+    radius = sqrt(deltaX * deltaX + deltaY * deltaY);
+    theta = theta - thetaM;
+    deltaX = radius * cos(theta);
+    deltaY = radius * sin(theta);
 
-    drive -> getModel() -> tank(translate.power - turnAngle.power, translate.power + turnAngle.power);
+    newTheta += M_PI;
 
-    if (abs(translate.error) < 5 && abs(turnAngle.error) < 1)
+    while (newTheta <= 0)
     {
+      newTheta += 2 * M_PI;
+    }
+
+    newTheta = fmod(newTheta, 2 * M_PI);
+    newTheta -= M_PI;
+
+    angle = newTheta;
+    x += deltaX;
+    y += deltaY;
+
+    //////////////// Move Functions Start Here ////////////////
+    switch (turnComplete)
+    {
+    case (true):
+      distanceX = x_pos - x;
+      distanceY = y_pos - y;
+      targetDistance = sqrt(distanceX * distanceX + distanceY * distanceY);
+
+
+      drift.error = targetAngle - angle;
+      drift.power = driftController.step(drift.error);
+
+      translate.error = targetDistance;
+      translate.power = moveController.step(translate.error);
+
+      drive -> getModel() -> tank(translate.power, translate.power); //add drift to power
+
+      if (abs(translate.error) < 5 && abs(drift.error) < 1)
+      {
+        routeComplete = true;
+      }
+      break;
+
+    case (false):
+      rotate.error = targetAngle - angle;
+      rotate.power = rotateController.step(rotate.error);
+
+      drive -> getModel() -> tank(rotate.power, -rotate.power);
+
+      if (abs(rotate.error) < 1)
+      {
+        turnComplete = true;
+      }
       break;
     }
-
     pros::delay(10);
   }
 
   drive -> getModel() -> tank(0, 0);
-}
-
-void odom_rotate(double x_pos, double y_pos)
-{
-  rotate.kP = 0.001575;
-	rotate.kI = 0.0005;
-	rotate.kD = 0.00015;
-
-	auto angleController = IterativeControllerFactory::posPID(rotate.kP, rotate.kI, rotate.kD);
-
-  while (true)
-  {
-    distanceX = x_pos - odometry(x);
-    distanceY = y_pos - odometry(y);
-
-    if (distanceX < 0)
-    {
-      distanceAngle = 3 * (M_PI/2) - atan2f(distanceY, distanceX) - odometry(angle);
-    }
-    else if (distanceX > 0)
-    {
-      distanceAngle = M_PI/2 - atan2f(distanceY, distanceX) - odometry(angle);
-    }
-
-    rotate.error = distanceAngle;
-    rotate.power = angleController.step(rotate.error);
-
-    drive -> getModel() -> tank(rotate.power, -rotate.power);
-
-    if (abs(rotate.error) < 1)
-    {
-      break;
-    }
-
-    pros::delay(10);
-  }
-
-  drive -> getModel() -> tank(0, 0);
-
 }
