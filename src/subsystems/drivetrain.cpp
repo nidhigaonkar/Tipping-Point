@@ -58,6 +58,10 @@ double distanceY;
 double targetDistance;
 double targetAngle;
 
+
+bool turnComplete = false;
+bool routeComplete = false;
+
 std::shared_ptr<ChassisController> drive =
   ChassisControllerBuilder()
   .withMotors({leftFront, leftBack}, {rightFront, rightBack})   //MotorGroups for left and right side
@@ -73,18 +77,38 @@ void updateDrive()
 
 void odometry(double x_pos, double y_pos)
 {
-  translate.kP = 0.000001;
-  translate.kI = 0;
-  translate.kD = 0.0000001;
+  //drive -> getModel() -> resetSensors();
+
+  leftBack.tarePosition();
+  leftFront.tarePosition();
+  rightBack.tarePosition();
+  rightFront.tarePosition();
+
+  translate.kP = 0.015;
+  translate.kI = 0.0015;
+  translate.kD = 0.0085; //was 0.007
+
+  drift.kP = 0.001;
+  //drift.kI = 0.0;
+  //drift.kD = 0;
+
 
 	auto moveController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
-  auto driftController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
+  //auto driftController = IterativeControllerFactory::posPID(drift.kP, drift.kI, drift.kD);
+  auto driftController = IterativeControllerFactory::posPID(drift.kP, 0.01, 0.01);
   auto rotateController = IterativeControllerFactory::posPID(translate.kP, translate.kI, translate.kD);
 
-  bool turnComplete = false;
-  bool routeComplete = false;
 
-  targetAngle = -1 * (atan2f(distanceY, distanceX - M_PI/2));
+
+  if (atan2f(distanceY, distanceX) == 0)
+  {
+    targetAngle = 0;
+  }
+  else
+  {
+    targetAngle = -1 * (atan2f(distanceY, distanceX) - M_PI/2);
+  }
+  pros::lcd::set_text(1, std::to_string(atan2f(distanceY, distanceX)));
 
   while (routeComplete == false)
   {
@@ -141,45 +165,72 @@ void odometry(double x_pos, double y_pos)
     newTheta -= M_PI;
 
     angle = newTheta;
-    x += deltaX;
-    y += deltaY;
+    x += deltaX; //current x position
+    y += deltaY;  //current y position
+
+    //  right is negative x left is negative x
+    pros::lcd::set_text(3, std::to_string(y));
+
+
 
     //////////////// Move Functions Start Here ////////////////
-    switch (turnComplete)
+    if (turnComplete  == true)
     {
-    case (true):
       distanceX = x_pos - x;
       distanceY = y_pos - y;
+      pros::lcd::set_text(4, std::to_string(distanceY));
       targetDistance = sqrt(distanceX * distanceX + distanceY * distanceY);
-
 
       drift.error = targetAngle - angle;
       drift.power = driftController.step(drift.error);
 
+      // for drift constant * angle + power
+
       translate.error = targetDistance;
       translate.power = moveController.step(translate.error);
 
-      drive -> getModel() -> tank(translate.power, translate.power); //add drift to power
+      //pros::lcd::set_text(3, std::to_string(translate.power));  //accurate values
 
-      if (abs(translate.error) < 5 && abs(drift.error) < 1)
+      drive -> getModel() -> tank(-translate.power + drift.power, -translate.power - drift.power); //add drift to power
+
+
+      if (abs(translate.error) < 0.5 && abs(drift.error) < 1)
       {
         routeComplete = true;
       }
-      break;
 
-    case (false):
+    }
+    else
+    {
       rotate.error = targetAngle - angle;
       rotate.power = rotateController.step(rotate.error);
 
-      drive -> getModel() -> tank(rotate.power, -rotate.power);
+      pros::lcd::set_text(5, std::to_string(rotate.error));
+      //drive -> getModel() -> tank(rotate.power, -rotate.power);
 
-      if (abs(rotate.error) < 1)
+      if (abs(rotate.error) < M_PI/180)
       {
         turnComplete = true;
       }
-      break;
     }
+    //pros::lcd::set_text(2, std::to_string(translate.error));
+    //pros::lcd::set_text(5, std::to_string(turnComplete));
     pros::delay(10);
+
+    // switch (choice) {
+    //   case 'x':
+    //     return x;
+    //     break;
+    //   case 'y':
+    //     return y;
+    //     break;
+    //   case 'a':
+    //     return angle;
+    //     break;
+    //   }
+
+
+
   }
 
   drive -> getModel() -> tank(0, 0);
